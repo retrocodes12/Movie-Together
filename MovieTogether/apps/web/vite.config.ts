@@ -14,6 +14,9 @@ import { restart } from './plugins/restart';
 import { restartEnvFileChange } from './plugins/restartEnvFileChange';
 
 export default defineConfig({
+  build: {
+    target: 'esnext',
+  },
   // Keep them available via import.meta.env.NEXT_PUBLIC_*
   envPrefix: 'NEXT_PUBLIC_',
   optimizeDeps: {
@@ -45,7 +48,10 @@ export default defineConfig({
       babelConfig: {
         babelrc: false, // don’t merge other Babel files
         configFile: false,
-        plugins: ['styled-jsx/babel'],
+        plugins: [
+          ['@babel/plugin-transform-typescript', { isTSX: true, allExtensions: true }],
+          'styled-jsx/babel',
+        ],
       },
     }),
     restart({

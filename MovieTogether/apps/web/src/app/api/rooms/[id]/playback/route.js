@@ -27,11 +27,11 @@ async function getRoom(roomId) {
 
 async function isMember(roomId, userId) {
   const rows = await sql`
-    SELECT id FROM mt_room_members
+    SELECT id, can_control FROM mt_room_members
     WHERE room_id = ${roomId} AND user_id = ${userId} AND is_active = true
     LIMIT 1
   `;
-  return rows.length > 0;
+  return rows[0] || null;
 }
 
 async function logEvent(roomId, userId, eventType, payload) {
@@ -78,8 +78,8 @@ export async function POST(request, { params }) {
       return Response.json({ error: "Room has ended" }, { status: 410 });
     }
 
-    const memberCheck = await isMember(id, user.id);
-    if (!memberCheck) {
+    const member = await isMember(id, user.id);
+    if (!member) {
       return Response.json(
         { error: "Not a member of this room" },
         { status: 403 },
@@ -87,6 +87,7 @@ export async function POST(request, { params }) {
     }
 
     const isHost = room.host_id === user.id;
+    const canControl = isHost || member.can_control === true;
     const now = new Date().toISOString();
     const currentPS = room.playback_state || {
       status: "idle",
@@ -106,9 +107,9 @@ export async function POST(request, { params }) {
     }
 
     // ── Host-only commands ────────────────────────────────────────
-    if (!isHost) {
+    if (!canControl) {
       return Response.json(
-        { error: "Only the host can control playback" },
+        { error: "Only the host or delegated controllers can control playback" },
         { status: 403 },
       );
     }

@@ -23,7 +23,7 @@ export async function GET(request, { params }) {
 
     const members = await sql`
       SELECT 
-        rm.joined_at, rm.is_active, rm.last_heartbeat,
+        rm.joined_at, rm.is_active, rm.last_heartbeat, rm.can_control,
         CASE WHEN rm.last_heartbeat > NOW() - INTERVAL '20 seconds'
              THEN true ELSE false END AS is_online,
         u.id as user_id, u.username, u.display_name, u.avatar_url
@@ -82,9 +82,15 @@ export async function PUT(request, { params }) {
       return Response.json({ error: "Room not found" }, { status: 404 });
     }
 
-    if (roomRows[0].host_id !== userRows[0].id) {
+    const controlRows = await sql`
+      SELECT can_control FROM mt_room_members
+      WHERE room_id = ${id} AND user_id = ${userRows[0].id} AND is_active = true
+      LIMIT 1
+    `;
+
+    if (roomRows[0].host_id !== userRows[0].id && !controlRows[0]?.can_control) {
       return Response.json(
-        { error: "Only the host can update the room" },
+        { error: "Only the host or delegated controllers can update the room" },
         { status: 403 },
       );
     }

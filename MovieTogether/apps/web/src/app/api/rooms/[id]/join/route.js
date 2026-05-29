@@ -27,8 +27,17 @@ export async function POST(request, { params }) {
     if (room.status === "ended") {
       return Response.json({ error: "This room has ended" }, { status: 400 });
     }
-    if (!room.is_public && invite_code !== room.invite_code) {
-      return Response.json({ error: "Invalid invite code" }, { status: 403 });
+    let inviteGrant = null;
+    if (!room.is_public) {
+      const grants = await sql`
+        SELECT can_control FROM mt_room_invites
+        WHERE room_id = ${id} AND invited_user_id = ${userId}
+        LIMIT 1
+      `;
+      inviteGrant = grants[0] || null;
+      if (invite_code !== room.invite_code && !inviteGrant) {
+        return Response.json({ error: "Private room invite required" }, { status: 403 });
+      }
     }
 
     const memberCount = await sql`
@@ -41,10 +50,15 @@ export async function POST(request, { params }) {
 
     // Upsert membership — mark online immediately
     await sql`
-      INSERT INTO mt_room_members (room_id, user_id, is_active, is_online, last_heartbeat)
-      VALUES (${id}, ${userId}, true, true, NOW())
+      INSERT INTO mt_room_members (room_id, user_id, is_active, is_online, can_control, last_heartbeat)
+      VALUES (${id}, ${userId}, true, true, ${room.host_id === userId || !!inviteGrant?.can_control}, NOW())
       ON CONFLICT (room_id, user_id)
-      DO UPDATE SET is_active = true, is_online = true, last_heartbeat = NOW(), joined_at = NOW()
+      DO UPDATE SET
+        is_active = true,
+        is_online = true,
+        can_control = mt_room_members.can_control OR EXCLUDED.can_control,
+        last_heartbeat = NOW(),
+        joined_at = NOW()
     `;
 
     await sql`
@@ -59,7 +73,7 @@ export async function POST(request, { params }) {
 
     // Return full room snapshot
     const members = await sql`
-      SELECT rm.joined_at, rm.is_active, rm.last_heartbeat, rm.is_online,
+      SELECT rm.joined_at, rm.is_active, rm.last_heartbeat, rm.is_online, rm.can_control,
              u.id as user_id, u.username, u.display_name, u.avatar_url
       FROM mt_room_members rm
       JOIN mt_users u ON rm.user_id = u.id

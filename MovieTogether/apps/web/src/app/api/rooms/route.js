@@ -68,6 +68,11 @@ export async function POST(request) {
       movie_year,
       movie_poster_url,
       stream_url,
+      selected_stream,
+      content_type,
+      content_id,
+      invited_user_ids,
+      control_user_ids,
       max_members,
       is_public,
     } = body;
@@ -104,12 +109,30 @@ export async function POST(request) {
       INSERT INTO mt_rooms (
         name, host_id, movie_title, movie_description, movie_genre,
         movie_year, movie_poster_url, stream_url, invite_code,
-        max_members, is_public, status
+        max_members, is_public, status, playback_state
       ) VALUES (
         ${name}, ${userId}, ${movie_title}, ${movie_description || ""},
         ${movie_genre || ""}, ${movie_year || null}, ${movie_poster_url || null},
         ${stream_url || ""}, ${inviteCode}, ${max_members || 10},
-        ${is_public !== false}, 'waiting'
+        ${is_public !== false}, 'waiting',
+        ${JSON.stringify({
+          status: "idle",
+          position: 0,
+          speed: 1,
+          content_url: stream_url || "",
+          content_type: content_type || "movie",
+          content_id: content_id || null,
+          content_meta: {
+            name: movie_title,
+            description: movie_description || "",
+            genres: movie_genre ? String(movie_genre).split(",").map((g) => g.trim()).filter(Boolean) : [],
+            year: movie_year || null,
+            poster: movie_poster_url || null,
+            selected_stream: selected_stream || null,
+          },
+          updated_at: new Date().toISOString(),
+          updated_by: userId,
+        })}::jsonb
       ) RETURNING *
     `;
 
@@ -117,10 +140,36 @@ export async function POST(request) {
 
     // Auto-join host
     await sql`
-      INSERT INTO mt_room_members (room_id, user_id, is_active)
-      VALUES (${room.id}, ${userId}, true)
-      ON CONFLICT (room_id, user_id) DO UPDATE SET is_active = true
+      INSERT INTO mt_room_members (room_id, user_id, is_active, is_online, can_control, last_heartbeat)
+      VALUES (${room.id}, ${userId}, true, true, true, NOW())
+      ON CONFLICT (room_id, user_id)
+      DO UPDATE SET is_active = true, is_online = true, can_control = true, last_heartbeat = NOW()
     `;
+
+    const allowedIds = Array.from(
+      new Set([...(Array.isArray(invited_user_ids) ? invited_user_ids : []), ...(Array.isArray(control_user_ids) ? control_user_ids : [])]
+        .map((id) => Number(id))
+        .filter(Number.isFinite)),
+    );
+    for (const invitedId of allowedIds) {
+      await sql`
+        INSERT INTO mt_room_invites (room_id, invited_user_id, invited_by, can_control)
+        VALUES (${room.id}, ${invitedId}, ${userId}, ${Array.isArray(control_user_ids) && control_user_ids.map(Number).includes(invitedId)})
+        ON CONFLICT (room_id, invited_user_id)
+        DO UPDATE SET can_control = EXCLUDED.can_control, invited_by = EXCLUDED.invited_by, updated_at = NOW()
+      `;
+
+      await sql`
+        INSERT INTO mt_notifications (user_id, type, title, body, data)
+        VALUES (
+          ${invitedId},
+          'room_invite',
+          'Watch Together invite',
+          ${`You were invited to "${name}"`},
+          ${JSON.stringify({ room_id: room.id, invite_code: inviteCode, can_control: Array.isArray(control_user_ids) && control_user_ids.map(Number).includes(invitedId) })}::jsonb
+        )
+      `;
+    }
 
     // Increment hosted count
     await sql`
