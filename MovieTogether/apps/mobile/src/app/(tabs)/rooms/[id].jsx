@@ -356,7 +356,7 @@ export default function WatchRoomScreen() {
 
   const handleContentSelected = useCallback(
     async (url, meta) => {
-      if (sync.changeContent) await sync.changeContent(url).catch(() => {});
+      if (sync.changeContent) await sync.changeContent(url, meta).catch(() => {});
       if (meta?.name) {
         fetch("/api/watchhistory", {
           method: "POST",

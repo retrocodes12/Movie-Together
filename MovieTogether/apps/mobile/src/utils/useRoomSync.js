@@ -117,9 +117,10 @@ export function useRoomSync({ roomId, deviceId, userId, initialRoom }) {
   );
 
   const changeContent = useCallback(
-    async (contentUrl) => {
+    async (contentUrl, contentMeta = null) => {
       return sendCommand(PlaybackEvents.CHANGE_CONTENT, {
         content_url: contentUrl,
+        content_meta: contentMeta,
       });
     },
     [sendCommand],

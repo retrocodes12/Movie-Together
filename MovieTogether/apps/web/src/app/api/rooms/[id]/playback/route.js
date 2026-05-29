@@ -197,15 +197,29 @@ export async function POST(request, { params }) {
             { status: 400 },
           );
         }
+        const contentMeta = payload.content_meta || null;
         updatedPS = await updatePlaybackState(id, {
           status: "idle",
           position: 0,
           content_url: payload.content_url,
+          content_meta: contentMeta,
           updated_at: now,
           updated_by: user.id,
         });
         // Persist stream_url too
-        await sql`UPDATE mt_rooms SET stream_url = ${payload.content_url}, status = 'waiting', updated_at = NOW() WHERE id = ${id}`;
+        await sql`
+          UPDATE mt_rooms
+          SET
+            stream_url = ${payload.content_url},
+            movie_title = COALESCE(${contentMeta?.name || null}, movie_title),
+            movie_description = COALESCE(${contentMeta?.description || null}, movie_description),
+            movie_genre = COALESCE(${Array.isArray(contentMeta?.genres) ? contentMeta.genres.join(", ") : null}, movie_genre),
+            movie_year = COALESCE(${Number.parseInt(contentMeta?.year || contentMeta?.releaseInfo, 10) || null}, movie_year),
+            movie_poster_url = COALESCE(${contentMeta?.poster || null}, movie_poster_url),
+            status = 'waiting',
+            updated_at = NOW()
+          WHERE id = ${id}
+        `;
         break;
       }
 
