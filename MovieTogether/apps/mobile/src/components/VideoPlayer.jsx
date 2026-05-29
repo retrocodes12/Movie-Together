@@ -386,6 +386,7 @@ function SettingsModal({
 
 export default function VideoPlayer({
   contentUrl,
+  contentHeaders,
   isHost,
   playbackState, // authoritative from roomSync
   onPlay,
@@ -404,8 +405,19 @@ export default function VideoPlayer({
 
   // ── Player setup ──────────────────────────────────────────────────────────
 
+  const contentSource = useMemo(
+    () =>
+      contentUrl
+        ? {
+            uri: contentUrl,
+            ...(contentHeaders ? { headers: contentHeaders } : {}),
+          }
+        : null,
+    [contentUrl, contentHeaders],
+  );
+
   const player = useVideoPlayer(
-    contentUrl ? { uri: contentUrl } : null,
+    contentSource,
     (p) => {
       p.playbackRate = playbackState?.speed || 1.0;
       p.allowsExternalPlayback = true;
@@ -504,7 +516,7 @@ export default function VideoPlayer({
         const delay = Math.pow(2, retryCount) * 1500;
         setTimeout(() => {
           try {
-            if (contentUrl) player.replace({ uri: contentUrl });
+            if (contentSource) player.replace(contentSource);
             setRetryCount((c) => c + 1);
           } catch {}
         }, delay);
@@ -632,18 +644,18 @@ export default function VideoPlayer({
     setRetryCount(0);
     setErrorMsg("");
     try {
-      if (contentUrl) player.replace({ uri: contentUrl });
+      if (contentSource) player.replace(contentSource);
     } catch {}
-  }, [player, contentUrl]);
+  }, [player, contentSource]);
 
   // ── Content URL change ────────────────────────────────────────────────────
 
   useEffect(() => {
     if (!contentUrl) return;
     try {
-      player.replace({ uri: contentUrl });
+      if (contentSource) player.replace(contentSource);
     } catch {}
-  }, [contentUrl]);
+  }, [contentUrl, contentSource]);
 
   // ── Render progress ───────────────────────────────────────────────────────
 

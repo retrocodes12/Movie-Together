@@ -208,6 +208,7 @@ export default function WatchRoomScreen() {
   // Active content URL — set by host via CHANGE_CONTENT, falls back to room stream_url
   const contentUrl =
     sync.playbackState?.content_url || room?.stream_url || null;
+  const contentHeaders = sync.playbackState?.content_headers || null;
 
   // ── Chat polling ──────────────────────────────────────────────────────────
   const fetchMessages = useCallback(
@@ -356,7 +357,10 @@ export default function WatchRoomScreen() {
 
   const handleContentSelected = useCallback(
     async (url, meta) => {
-      if (sync.changeContent) await sync.changeContent(url, meta).catch(() => {});
+      if (sync.changeContent) {
+        await sync.changeContent(url, meta).catch(() => {});
+        await sync.play?.(0).catch(() => {});
+      }
       if (meta?.name) {
         fetch("/api/watchhistory", {
           method: "POST",
@@ -552,6 +556,7 @@ export default function WatchRoomScreen() {
       ) : (
         <VideoPlayer
           contentUrl={contentUrl}
+          contentHeaders={contentHeaders}
           isHost={isHost}
           playbackState={sync.playbackState}
           onPlay={sync.play}

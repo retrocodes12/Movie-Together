@@ -54,7 +54,7 @@ export function useVideoSync({
     if (!player || !playbackState) return;
     if (commandLockRef.current) return; // local action in flight
 
-    const { status, position, speed = 1.0, content_url } = playbackState;
+    const { status, position, speed = 1.0, content_url, content_headers } = playbackState;
 
     // Content change — replace source
     if (
@@ -63,7 +63,10 @@ export function useVideoSync({
       content_url !== lastAppliedPositionRef.current?.url
     ) {
       try {
-        player.replace({ uri: content_url });
+        player.replace({
+          uri: content_url,
+          ...(content_headers ? { headers: content_headers } : {}),
+        });
         lastAppliedPositionRef.current = { url: content_url };
       } catch (e) {
         console.warn("useVideoSync: replace failed", e);

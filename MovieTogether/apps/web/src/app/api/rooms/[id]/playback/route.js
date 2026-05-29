@@ -198,10 +198,13 @@ export async function POST(request, { params }) {
           );
         }
         const contentMeta = payload.content_meta || null;
+        const selectedStream = contentMeta?.selected_stream || {};
+        const contentHeaders = selectedStream.requestHeaders || null;
         updatedPS = await updatePlaybackState(id, {
           status: "idle",
           position: 0,
           content_url: payload.content_url,
+          content_headers: contentHeaders,
           content_meta: contentMeta,
           updated_at: now,
           updated_by: user.id,

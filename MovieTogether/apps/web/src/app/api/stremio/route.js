@@ -193,11 +193,32 @@ function streamUrlType(stream) {
   return "unknown";
 }
 
+function streamContainer(url = "") {
+  const match = String(url).toLowerCase().match(/\.([a-z0-9]+)(?:\?|$)/);
+  return match?.[1] || "";
+}
+
+function isRoomPlayable(stream) {
+  if (!stream.url || !/^https?:\/\//i.test(stream.url)) return false;
+  const container = streamContainer(stream.url);
+  const host = (() => {
+    try {
+      return new URL(stream.url).hostname;
+    } catch {
+      return "";
+    }
+  })();
+  if (/hubcloud|pixel/i.test(host)) return false;
+  if (["mkv", "avi"].includes(container)) return false;
+  return true;
+}
+
 function normalizeStream(stream, addon) {
   const text = [stream.name, stream.title, stream.description, stream.behaviorHints?.filename]
     .filter(Boolean)
     .join(" ");
   const url = stream.url || stream.externalUrl || null;
+  const requestHeaders = stream.behaviorHints?.proxyHeaders?.request || null;
   return {
     name: stream.name || addon?.name || "Stream",
     title: stream.title || "",
@@ -209,9 +230,10 @@ function normalizeStream(stream, addon) {
     fileIdx: stream.fileIdx,
     subtitles: stream.subtitles || [],
     behaviorHints: stream.behaviorHints || {},
+    requestHeaders,
     quality: extractQuality(text),
     streamType: streamUrlType(stream),
-    playable: Boolean(stream.url && /^https?:\/\//i.test(stream.url)),
+    playable: isRoomPlayable(stream),
     source: addon?.name || "Addon",
     addonUrl: addon?.url || null,
   };

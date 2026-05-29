@@ -417,8 +417,13 @@ export default function ContentSearch({ visible, onClose, onSelectStream }) {
     const meta = {
       ...(metadata || selected),
       selected_video: selectedVideo,
-      stream_source: stream.source,
-      stream_quality: stream.quality,
+      selected_stream: {
+        source: stream.source,
+        quality: stream.quality,
+        streamType: stream.streamType,
+        requestHeaders: stream.requestHeaders || null,
+        subtitles: stream.subtitles || [],
+      },
     };
     onSelectStream(stream.url, meta);
     onClose();
