@@ -9,7 +9,7 @@
  * to mt_room_events so reconnecting clients can recover state.
  */
 
-import sql from "@/app/api/utils/sql";
+import sql from "../../../utils/sql.js";
 
 const SKIP_SECONDS = 10;
 

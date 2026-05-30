@@ -28,6 +28,9 @@ async function findRouteFiles(dir: string): Promise<string[]> {
       const statResult = await stat(filePath);
 
       if (statResult.isDirectory()) {
+        if (file === '__create') {
+          continue;
+        }
         routes = routes.concat(await findRouteFiles(filePath));
       } else if (file === 'route.js') {
         // Handle root route.js specially

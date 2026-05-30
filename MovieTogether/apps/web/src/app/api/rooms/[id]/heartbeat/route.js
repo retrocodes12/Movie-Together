@@ -7,7 +7,7 @@
  * If the host goes offline, host migration is triggered.
  */
 
-import sql from "@/app/api/utils/sql";
+import sql from "../../../utils/sql.js";
 
 const PRESENCE_TIMEOUT_S = 20; // seconds
 

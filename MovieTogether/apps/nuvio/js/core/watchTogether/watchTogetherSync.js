@@ -25,6 +25,10 @@ export const WatchTogetherSync = {
   pollTimer: null,
   reactionSince: null,
   voiceState: { muted: false, deafened: false, push_to_talk: false, speaking: false },
+  voiceStream: null,
+  voiceAudioContext: null,
+  voiceAnalyser: null,
+  voiceVadTimer: null,
   listeners: [],
   overlayRoot: null,
 
@@ -51,6 +55,7 @@ export const WatchTogetherSync = {
       this.sendVoiceState().catch(() => {});
     }, 8000);
     this.pollTimer = setInterval(() => this.refresh(), 1500);
+    this.startVoiceCapture().catch(() => this.sendVoiceState().catch(() => {}));
     this.refresh();
   },
 
@@ -64,6 +69,7 @@ export const WatchTogetherSync = {
     if (this.roomId) {
       WatchTogetherClient.voice(this.roomId, { action: "leave" }).catch(() => {});
     }
+    this.stopVoiceCapture();
     this.roomId = null;
     this.room = null;
     this.PlayerController = null;
@@ -138,6 +144,17 @@ export const WatchTogetherSync = {
 
   setVoiceState(patch = {}) {
     this.voiceState = { ...this.voiceState, ...patch };
+    if (Object.prototype.hasOwnProperty.call(patch, "muted") && this.voiceStream) {
+      this.voiceStream.getAudioTracks().forEach((track) => {
+        track.enabled = !patch.muted;
+      });
+      if (patch.muted) {
+        this.voiceState = { ...this.voiceState, speaking: false, vad_level: 0 };
+      }
+    }
+    if (patch.muted === false && !this.voiceStream) {
+      this.startVoiceCapture().catch(() => {});
+    }
     return this.sendVoiceState();
   },
 
@@ -159,5 +176,59 @@ export const WatchTogetherSync = {
   react(emoji) {
     if (!this.roomId) return Promise.resolve(null);
     return WatchTogetherClient.react(this.roomId, emoji, this.localPosition());
+  },
+
+  async startVoiceCapture() {
+    if (!this.roomId || this.voiceStream || !globalThis.navigator?.mediaDevices?.getUserMedia) return null;
+    const stream = await globalThis.navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true
+      }
+    });
+    this.voiceStream = stream;
+    const AudioContextCtor = globalThis.AudioContext || globalThis.webkitAudioContext;
+    if (AudioContextCtor) {
+      this.voiceAudioContext = new AudioContextCtor();
+      const source = this.voiceAudioContext.createMediaStreamSource(stream);
+      this.voiceAnalyser = this.voiceAudioContext.createAnalyser();
+      this.voiceAnalyser.fftSize = 512;
+      source.connect(this.voiceAnalyser);
+    }
+    this.voiceState = { ...this.voiceState, muted: false, speaking: false, vad_level: 0 };
+    this.voiceVadTimer = setInterval(() => this.updateVoiceActivity(), 300);
+    await this.sendVoiceState();
+    return stream;
+  },
+
+  stopVoiceCapture() {
+    if (this.voiceVadTimer) clearInterval(this.voiceVadTimer);
+    this.voiceVadTimer = null;
+    if (this.voiceStream) {
+      this.voiceStream.getTracks().forEach((track) => track.stop());
+    }
+    this.voiceStream = null;
+    this.voiceAnalyser = null;
+    this.voiceAudioContext?.close?.().catch?.(() => {});
+    this.voiceAudioContext = null;
+    this.voiceState = { ...this.voiceState, speaking: false, vad_level: 0 };
+  },
+
+  updateVoiceActivity() {
+    if (!this.roomId || !this.voiceAnalyser) return;
+    const data = new Uint8Array(this.voiceAnalyser.fftSize);
+    this.voiceAnalyser.getByteTimeDomainData(data);
+    let sum = 0;
+    for (let index = 0; index < data.length; index += 1) {
+      const delta = (data[index] - 128) / 128;
+      sum += delta * delta;
+    }
+    const level = Math.sqrt(sum / data.length);
+    const speaking = !this.voiceState.muted && !this.voiceState.deafened && level > 0.045;
+    if (speaking !== this.voiceState.speaking || Math.abs(level - Number(this.voiceState.vad_level || 0)) > 0.02) {
+      this.voiceState = { ...this.voiceState, speaking, vad_level: Number(level.toFixed(3)) };
+      this.sendVoiceState().catch(() => {});
+    }
   }
 };

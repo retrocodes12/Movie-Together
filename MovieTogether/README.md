@@ -1,34 +1,56 @@
 # Nuvio Watch Together
 
-Nuvio Watch Together extends Nuvio into a social watch-party platform. Nuvio still owns content discovery, metadata, addon integration, stream retrieval, playback, subtitles, and browsing. Watch Together adds rooms, synchronized playback, voice state/signaling, discussion mode, reactions, friends, invitations, voting, reviews, ratings, and watch history.
+This project now uses the Nuvio codebase as the media foundation and extends it with Watch Together social rooms.
 
-## What changed
+Nuvio remains responsible for content discovery, search, metadata, addon ecosystem support, stream retrieval, stream selection, playback, subtitles, and browsing. Watch Together adds rooms, synchronization, voice state/signaling, discussion mode, reactions, friends, invitations, voting, watch history, reviews, ratings, and notifications.
 
-- Web app entry at `apps/web/src/app/page.jsx`
-- Watch Together APIs under `apps/web/src/app/api`
-- PostgreSQL schema at `apps/web/database.sql`
-- Deploy scripts in `apps/web/package.json`
+## Apps
 
-## Core flow
+- `apps/nuvio` - Nuvio web app with Watch Together buttons and player sync layer.
+- `apps/web` - Watch Together API/backend for rooms, social data, sync state, voice signaling, and invites.
+- `apps/mobile` - mobile social shell. Custom media discovery was removed; content discovery and playback happen in Nuvio.
 
-1. Create profile.
-2. Search content through `/api/stremio`.
-3. Select existing Nuvio/Stremio stream option.
-4. Click `Watch Together`.
-5. Room gets invite code and `/join/:code` invite link.
-6. Members join, playback syncs from server state.
-7. Room voice, discussion mode, live reactions, votes, chat, reviews, and history use Watch Together APIs.
+## Removed
 
-## Systems reused
+The old custom Stremio backend endpoint was removed:
 
-- Search/discovery: `/api/stremio?query=...`
-- Metadata: Stremio `meta` resources
-- Addons: Stremio manifests and catalogs
-- Stream resolution: Stremio `stream` resources
-- Playback: browser video/player surface, no replacement media platform
-- Subtitles/stream hints: preserved in selected stream metadata
+```text
+apps/web/src/app/api/stremio/route.js
+```
 
-## Watch Together API map
+Do not rebuild it. Nuvio handles addon discovery, metadata, stream resolution, stream selection, playback, and subtitle behavior.
+
+## Watch Together Flow
+
+1. User discovers content in Nuvio.
+2. User selects stream through Nuvio's existing stream UI.
+3. User clicks `Watch Together`.
+4. Backend creates room, invite code, and invite link.
+5. Nuvio opens existing player with room metadata.
+6. Sync layer controls Nuvio's player instead of replacing it.
+7. Friends join room through invite link/code.
+8. Playback, discussion mode, reactions, voice state, and votes sync through backend APIs.
+
+## Frontend Integration
+
+Watch Together entry points were added to Nuvio:
+
+- content detail page: `Watch Together` button next to play action
+- stream selection page: `Watch Together` button per stream
+- player page: room panel with invite, discussion, mute, reactions, and member list
+
+Relevant files:
+
+- `apps/nuvio/js/core/watchTogether/watchTogetherClient.js`
+- `apps/nuvio/js/core/watchTogether/watchTogetherSync.js`
+- `apps/nuvio/js/ui/screens/detail/metaDetailsScreen.js`
+- `apps/nuvio/js/ui/screens/stream/streamScreen.js`
+- `apps/nuvio/js/ui/screens/player/playerScreen.js`
+- `apps/nuvio/css/components.css`
+
+## Backend API
+
+Watch Together APIs live under `apps/web/src/app/api`:
 
 - `GET/POST /api/profile`
 - `GET/POST /api/rooms`
@@ -50,7 +72,7 @@ Nuvio Watch Together extends Nuvio into a social watch-party platform. Nuvio sti
 
 ## Database
 
-Use any PostgreSQL provider reachable from serverless/server deployments. Neon is already supported through `@neondatabase/serverless`.
+PostgreSQL schema:
 
 ```bash
 psql "$DATABASE_URL" -f apps/web/database.sql
@@ -66,10 +88,27 @@ Optional env:
 
 ```bash
 AUTH_SECRET=...
-AUTH_URL=https://your-domain.example
+AUTH_URL=https://your-backend.example
 ```
 
-## Local development
+## Configure Nuvio
+
+Set Watch Together backend URL in `apps/nuvio/nuvio.env.js`:
+
+```js
+(function defineNuvioEnv() {
+  var root = typeof globalThis !== "undefined" ? globalThis : window;
+  root.__NUVIO_ENV__ = {
+    WATCH_TOGETHER_API_BASE_URL: "https://your-backend.example"
+  };
+}());
+```
+
+If Nuvio and backend share one origin, leave `WATCH_TOGETHER_API_BASE_URL` empty.
+
+## Local Development
+
+Backend:
 
 ```bash
 cd apps/web
@@ -77,97 +116,93 @@ npm install
 npm run dev
 ```
 
-Open `http://localhost:5173`.
+Nuvio:
 
-## Build and run
+```bash
+cd apps/nuvio
+npm install
+npm run build
+npm run serve
+```
+
+Open Nuvio, configure backend URL if needed, browse content, select stream, then create Watch Together room.
+
+## Production Build
+
+Backend:
 
 ```bash
 cd apps/web
+npm install
 npm run build
 npm run start
 ```
 
-## Vercel deploy
-
-Set project root to `apps/web`.
-
-Build command:
+Nuvio static app:
 
 ```bash
+cd apps/nuvio
+npm install
 npm run build
 ```
 
-Install command:
+Deploy `apps/nuvio/dist` to static hosting.
 
-```bash
-npm install
-```
+## Vercel
 
-Output is handled by React Router server build. Add `DATABASE_URL` in Vercel environment variables and run `apps/web/database.sql` once against that database.
+Recommended split deployment:
 
-## Render deploy
+1. Deploy `apps/web` as backend project.
+2. Add `DATABASE_URL`.
+3. Run `apps/web/database.sql` once against the database.
+4. Deploy `apps/nuvio/dist` as static frontend.
+5. Set `WATCH_TOGETHER_API_BASE_URL` to backend URL in Nuvio env file before build, or serve a runtime `nuvio.env.js`.
 
-Use a Web Service.
+## Render
 
-Root directory:
+Backend Web Service:
 
 ```text
-apps/web
+Root directory: apps/web
+Build command: npm install && npm run build
+Start command: npm run start
 ```
 
-Build command:
+Static Nuvio site:
 
-```bash
-npm install && npm run build
+```text
+Root directory: apps/nuvio
+Build command: npm install && npm run build
+Publish directory: dist
 ```
 
-Start command:
+## Sync Model
 
-```bash
-npm run start
-```
+Playback state is server authoritative. Nuvio's player sends play, pause, seek, skip, episode change, and content change events to backend. Clients poll room snapshots, compare local media time against authoritative state, then auto-correct drift.
 
-Add `DATABASE_URL` in Render environment variables and run `apps/web/database.sql` once.
+Targets:
 
-## Other services
+- ideal drift under 100ms
+- maximum tolerated drift 500ms
+- host leaving does not end room
+- host migration selects another active member
+- private rooms can grant playback control to selected members
 
-Any Node host works if it can run:
+## Voice Model
 
-```bash
-npm install
-npm run build
-npm run start
-```
+Voice chat uses room voice state plus signaling payloads:
 
-Use Node 20+ and provide `DATABASE_URL`.
-
-## Room behavior
-
-- Public rooms appear in public room list.
-- Private rooms require invite code or host-created invite grant.
-- Host can give selected invited members playback control.
-- Leaving a room marks only that member inactive.
-- Host leaving migrates host to another active member when possible and never ends playback by itself.
-- Heartbeats keep presence current and trigger host migration for stale hosts.
-
-## Sync model
-
-Playback commands write to `mt_rooms.playback_state`. Clients poll/SSE room snapshots and reconcile local video position. Server state is authoritative. Drift correction seeks when client position differs by more than client threshold; target drift is under 100ms, maximum tolerated drift is 500ms.
-
-## Voice model
-
-`/api/rooms/:id/voice` stores room voice state and WebRTC signaling payloads:
-
-- connected/disconnected
+- join/leave voice channel
 - mute/unmute
-- deafen/undeafen
-- push-to-talk
+- deafen/undeafen state
+- push-to-talk state
 - speaking indicators
-- VAD level
-- offer/answer/ICE signaling payload storage
+- VAD level fields
+- WebRTC offer/answer/ICE payload storage
+- reconnection through repeated heartbeat and voice state refresh
 
-Production voice media should use WebRTC peer connections or an SFU using this signaling surface. Serverless hosts do not relay raw audio.
+For production audio routing, connect browser WebRTC peer connections or an SFU to `/api/rooms/:id/voice`. Serverless deployments should not relay raw audio through HTTP.
 
 ## Legal
 
-This app is an interface for user-provided or user-installed sources. It does not host, store, or distribute media content.
+This app does not host, store, or distribute media content. User content discovery, addons, streams, and playback are handled by Nuvio and user-configured sources.

@@ -2,7 +2,7 @@
  * GET /api/users/search?q=&device_id=&limit=
  * Search for users by username or display name.
  */
-import sql from "@/app/api/utils/sql";
+import sql from "../../utils/sql.js";
 
 export async function GET(request) {
   try {

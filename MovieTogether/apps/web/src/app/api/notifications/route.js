@@ -3,7 +3,7 @@
  * PUT  /api/notifications { device_id, notification_id | mark_all: true }
  * DELETE /api/notifications?device_id=&notification_id=
  */
-import sql from "@/app/api/utils/sql";
+import sql from "../utils/sql.js";
 
 async function resolveUser(deviceId) {
   const rows =

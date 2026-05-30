@@ -9,7 +9,7 @@
  * every POLL_INTERVAL ms and pushes state diffs downstream.
  */
 
-import sql from "@/app/api/utils/sql";
+import sql from "../../../utils/sql.js";
 
 const POLL_INTERVAL = 2000; // ms between DB polls
 const PRESENCE_TIMEOUT = 20000; // ms before a member is considered offline

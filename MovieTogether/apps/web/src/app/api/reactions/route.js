@@ -2,7 +2,7 @@
  * GET  /api/reactions?room_id=&since=<iso>
  * POST /api/reactions { device_id, room_id, emoji, playback_position }
  */
-import sql from "@/app/api/utils/sql";
+import sql from "../utils/sql.js";
 
 const ALLOWED_EMOJIS = ["😂", "😱", "🔥", "❤️", "😭", "👏"];
 const RATE_LIMIT_WINDOW = 3; // seconds between reactions per user per room

@@ -3,7 +3,7 @@
  * POST /api/votes { device_id, room_id, vote_type, label, threshold, duration_s, payload }
  * PUT  /api/votes { device_id, vote_id, choice: yes|no }  — cast ballot
  */
-import sql from "@/app/api/utils/sql";
+import sql from "../utils/sql.js";
 
 async function resolveUser(deviceId) {
   const rows =

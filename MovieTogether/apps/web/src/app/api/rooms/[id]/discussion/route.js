@@ -6,7 +6,7 @@
  * Starting discussion pauses playback for the entire room.
  * Playback auto-resumes after silence_timeout seconds of no speaking activity.
  */
-import sql from "@/app/api/utils/sql";
+import sql from "../../../utils/sql.js";
 
 const DISCUSSION_DEBOUNCE_MS = 3000; // Minimum time between start/end actions
 

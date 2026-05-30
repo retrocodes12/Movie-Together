@@ -4,7 +4,7 @@
  * PUT  /api/reviews { device_id, review_id, rating, review_text, spoiler }
  * DELETE /api/reviews?device_id=&review_id=
  */
-import sql from "@/app/api/utils/sql";
+import sql from "../utils/sql.js";
 
 async function resolveUser(deviceId) {
   const rows =

@@ -2,7 +2,7 @@
  * GET  /api/friends?device_id=&status=accepted|pending
  * POST /api/friends  { device_id, target_username, action: send|accept|reject|remove|block }
  */
-import sql from "@/app/api/utils/sql";
+import sql from "../utils/sql.js";
 
 async function resolveUser(deviceId) {
   const rows =

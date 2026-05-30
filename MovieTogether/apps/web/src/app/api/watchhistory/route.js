@@ -2,7 +2,7 @@
  * GET  /api/watchhistory?device_id=&limit=
  * POST /api/watchhistory { device_id, room_id, movie_key, movie_title, movie_genre, movie_year, watch_duration, completed }
  */
-import sql from "@/app/api/utils/sql";
+import sql from "../utils/sql.js";
 
 async function resolveUser(deviceId) {
   const rows =
