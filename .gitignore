@@ -1,2 +1,4 @@
 .omx/
 anything.zip
+node_modules/
+build/

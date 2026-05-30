@@ -1,0 +1,12 @@
+{
+  "name": "movie-together-deploy",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "npm --prefix MovieTogether/apps/web run build"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "^0.10.4",
+    "hono": "^4.12.23"
+  }
+}
